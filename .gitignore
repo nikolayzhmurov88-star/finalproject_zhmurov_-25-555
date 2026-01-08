@@ -1,0 +1,26 @@
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Сборка пакета
+dist/
+build/
+*.egg-info/
+
+# Логи и временные файлы
+logs/
+*.log
+data/*.tmp
+
+# Кэш Ruff
+.ruff_cache/
+
+# Poetry
+poetry.lock
