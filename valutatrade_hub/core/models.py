@@ -183,3 +183,59 @@ class Wallet:
         }
 # =======================================================================
 
+class Portfolio:
+    """Управление всеми кошельками одного пользователя"""
+
+    def __init__(self, user_id: int, wallets: dict = None):
+        """Создаёт портфель для пользователя с указанными кошельками"""
+        self._user_id = user_id
+        self._wallets = wallets or {}
+
+    # Геттеры
+
+    @property
+    def user(self) -> int:
+        """Возвращает идентификатор пользователя (без возможности перезаписи)"""
+        return self._user_id
+
+    @property
+    def wallets(self) -> dict:
+        """Возвращает копию словаря кошельков"""
+        return self._wallets.copy()
+
+    # Методы работы с валютами
+
+    def add_currency(self, currency_code: str) -> None:
+        """Добавляет новый кошелёк в портфель, если его ещё нет"""
+        if currency_code in self._wallets:
+            raise ValueError(f"Валюта {currency_code} уже есть в портфеле")
+        self._wallets[currency_code] = Wallet(currency_code=currency_code, balance=0.0)
+
+    def get_wallet(self, currency_code: str) -> Wallet:
+        """Возвращает объект Wallet по коду валюты"""
+        if currency_code not in self._wallets:
+            raise KeyError(f"Валюта {currency_code} не найдена в портфеле")
+        return self._wallets[currency_code]
+
+    def get_total_value(self, base_currency: str = 'USD') -> float:
+        """Возвращает общую стоимость всех валют в указанной базовой валюте"""
+        # На данном этапе фиксированные курсы для ряда валют
+        exchange_rates = {
+            'USD': 1.0,
+            'EUR': 1.1,
+            'BTC': 40000.0,
+            'ETH': 2500.0,
+            
+        }
+
+        total = 0.0
+        for currency, wallet in self._wallets.items():
+            if currency == base_currency:
+                total += wallet.balance
+            else:
+                # Конвертируем баланс в base_currency
+                if currency in exchange_rates and base_currency in exchange_rates:
+                    rate = exchange_rates[currency] / exchange_rates[base_currency]
+                    total += wallet.balance * rate
+                # Если курс неизвестен, валюта не учитывается
+        return total
