@@ -130,3 +130,56 @@ class User:
 
 ### ============================================================
 
+class Wallet:
+    """Кошелёк пользователя для одной валюты"""
+
+    def __init__(self, currency_code: str, balance: float = 0.0):
+        """Создаёт кошелёк для указанной валюты с начальным балансом"""
+        self.currency_code = currency_code
+        self._balance = 0.0
+        self.balance = balance  # используем сеттер
+
+    # Геттер и сеттер balance
+
+    @property
+    def balance(self) -> float:
+        """Возвращает текущий баланс кошелька"""
+        return self._balance
+
+    @balance.setter
+    def balance(self, value: float) -> None:
+        """Устанавливает баланс, отрицательные значения и некорректные типы"""
+        if not isinstance(value, (int, float)):
+            raise TypeError("Баланс должен быть числом")
+        if value < 0:
+            raise ValueError("Баланс не может быть отрицательным")
+        self._balance = float(value)
+
+    # Методы работы с кошельком
+
+    def deposit(self, amount: float) -> None:
+        """Пополняет баланс кошелька"""
+        if not isinstance(amount, (int, float)):
+            raise TypeError("Сумма должна быть числом")
+        if amount <= 0:
+            raise ValueError("Сумма пополнения должна быть положительной")
+        self.balance += amount
+
+    def withdraw(self, amount: float) -> None:
+        """Снимает средства с кошелька, если баланс позволяет"""
+        if not isinstance(amount, (int, float)):
+            raise TypeError("Сумма должна быть числом")
+        if amount <= 0:
+            raise ValueError("Сумма снятия должна быть положительной")
+        if amount > self.balance:
+            raise ValueError("Недостаточно средств на кошельке")
+        self.balance -= amount
+
+    def get_balance_info(self) -> dict:
+        """Возвращает информацию о текущем балансе"""
+        return {
+            "currency_code": self.currency_code,
+            "balance": self.balance,
+        }
+# =======================================================================
+
