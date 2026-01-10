@@ -1,14 +1,14 @@
 # Основные классы программы
 
-
 # Необходимые импорты
 import hashlib # библиотека для хэширования паролей
 import secrets # для генерации случайной соли
+import json # для работы с JSON
 from datetime import datetime # для обработки даты и времени
-from typing import Dict, Any # !!!!
+from typing import Dict, Any # для аннотаций
+import valutatrade_hub.constants as const # Импорт констант с путями к файлам JSON
 
 
-# ========================================================
 class User:
     """Пользователь системы"""
 
@@ -36,15 +36,12 @@ class User:
         self._user_id = user_id # - user_id кладём в приватное поле _user_id 
         self.username = username # - username устанавливаем через сеттер
         self._salt = salt or secrets.token_hex(16) # - если salt не передан, генерируем случайную соль
-        self._hashed_password = self._hash_password(password) # - пароль хешируем и сохраняем хеш в _hashed_password
-        self._registration_date = registration_date or datetime.now().isoformat() # - если дата регистрации не передана, ставим текущее время в формате ISO
-
-
+        self.password = password  # - пароль хешируем и сохраняем хеш в _hashed_password
+        self._registration_date = registration_date or datetime.now().isoformat() # - если дата регистрации не передана, ставим текущее время
 
     # Геттеры и сеттеры
 
-
-    @property # Геттер для id полььзователя
+    @property # Геттер для id пользователя
     def user_id(self) -> int:
         """Получить ID пользователя"""
         return self._user_id
@@ -70,7 +67,7 @@ class User:
     def password(self, value: str) -> None: 
         """Устанавливает пароль: проверяет длину и хеширует."""
         if len(value) < 4:
-            raise ValueError("Пароль должен быть не короче 4 символов")
+            raise ValueError("\nПароль должен быть не короче 4 символов")
         # Хешируем пароль с солью
         salted = f"{self._salt}{value}".encode("utf-8")
         self._hashed_password = hashlib.sha256(salted).hexdigest()
@@ -80,12 +77,14 @@ class User:
         """Получить дату регистрации"""
         return self._registration_date
 
+   
     # Методы работы с паролем
-
     def verify_password(self, password: str) -> bool: # Метод проверки пароля пользователя
         """Проверяет, совпадает ли введённый пароль с сохранённым хешем"""
         try:
-            test_hash = self._hash_password(password)
+             # Собираем salt + password и считаем хеш
+            salted = f"{self._salt}{password}".encode("utf-8")
+            test_hash = hashlib.sha256(salted).hexdigest()
             return test_hash == self._hashed_password
         except ValueError:
             return False
@@ -95,7 +94,6 @@ class User:
         self.password = new_password  # вызовется сеттер с проверкой
 
     # Работа с данными пользователя
-
     def get_user_info(self) -> Dict[str, Any]:
         """Возвращает информацию о пользователе (без пароля)"""
         return {
@@ -105,8 +103,7 @@ class User:
         }
 
 
-### ==========================================================!!!!Код для работы с JSON
-
+    # Код для работы с JSON
     def to_dict(self) -> Dict[str, Any]:
         """Создает словарь для последующей записи в JSON."""
         return {
@@ -117,18 +114,18 @@ class User:
             "registration_date": self._registration_date,
         }
 
+    # Получаем данные из JSON и создаем объект
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "User":
-        """Создаёт User из словаря прочитанного из JSON."""
-        return cls(
-            user_id=data["user_id"],
-            username=data["username"],
-            password="",  # пароль не хранится в открытом виде
-            salt=data["salt"],
-            registration_date=data["registration_date"],
-        )
+        user = cls.__new__(cls)  
+        user._user_id = data["user_id"]
+        user._username = data["username"]
+        user._hashed_password = data["hashed_password"]
+        user._salt = data["salt"]
+        user._registration_date = data["registration_date"]
+        return user
 
-### ============================================================
+
 
 class Wallet:
     """Кошелёк пользователя для одной валюты"""
@@ -137,10 +134,9 @@ class Wallet:
         """Создаёт кошелёк для указанной валюты с начальным балансом"""
         self.currency_code = currency_code
         self._balance = 0.0
-        self.balance = balance  # используем сеттер
+        self.balance = balance 
 
     # Геттер и сеттер balance
-
     @property
     def balance(self) -> float:
         """Возвращает текущий баланс кошелька"""
@@ -155,8 +151,8 @@ class Wallet:
             raise ValueError("Баланс не может быть отрицательным")
         self._balance = float(value)
 
-    # Методы работы с кошельком
 
+    # Методы работы с кошельком
     def deposit(self, amount: float) -> None:
         """Пополняет баланс кошелька"""
         if not isinstance(amount, (int, float)):
@@ -181,7 +177,7 @@ class Wallet:
             "currency_code": self.currency_code,
             "balance": self.balance,
         }
-# =======================================================================
+
 
 class Portfolio:
     """Управление всеми кошельками одного пользователя"""
@@ -208,34 +204,73 @@ class Portfolio:
     def add_currency(self, currency_code: str) -> None:
         """Добавляет новый кошелёк в портфель, если его ещё нет"""
         if currency_code in self._wallets:
-            raise ValueError(f"Валюта {currency_code} уже есть в портфеле")
+            raise ValueError(f"\nВалюта {currency_code} уже есть в портфеле")
         self._wallets[currency_code] = Wallet(currency_code=currency_code, balance=0.0)
 
     def get_wallet(self, currency_code: str) -> Wallet:
         """Возвращает объект Wallet по коду валюты"""
         if currency_code not in self._wallets:
-            raise KeyError(f"Валюта {currency_code} не найдена в портфеле")
+            raise KeyError(f"\nВалюта {currency_code} не найдена в портфеле")
         return self._wallets[currency_code]
 
-    def get_total_value(self, base_currency: str = 'USD') -> float:
-        """Возвращает общую стоимость всех валют в указанной базовой валюте"""
-        # На данном этапе фиксированные курсы для ряда валют
-        exchange_rates = {
-            'USD': 1.0,
-            'EUR': 1.1,
-            'BTC': 40000.0,
-            'ETH': 2500.0,
-            
-        }
+    def get_total_value(self, base_currency: str = "USD") -> float:
+        """
+        Возвращает общую стоимость портфеля в указанной базовой валюте.
+        Курсы валют загружаются из rates.json.
+        """
+        try:
+            with open(const.RATES_FILE, "r", encoding="utf-8") as f:
+                rates_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, PermissionError):
+            # Если файл не найден или повреждён, возвращаем 0.0
+            return 0.0
 
+        
+        # Строим exchange_rates: валюта курс к base_currency
+        exchange_rates = {}
+        for pair, info in rates_data.items():
+            if pair in ("source", "last_refresh"):
+                continue
+            if "_" not in pair:
+                continue
+            from_curr, to_curr = pair.split("_", 1)
+            if to_curr == base_currency:
+                exchange_rates[from_curr] = info["rate"]
+        
+        # Считаем общую стоимость
         total = 0.0
         for currency, wallet in self._wallets.items():
             if currency == base_currency:
                 total += wallet.balance
             else:
-                # Конвертируем баланс в base_currency
-                if currency in exchange_rates and base_currency in exchange_rates:
-                    rate = exchange_rates[currency] / exchange_rates[base_currency]
+                rate = exchange_rates.get(currency)
+                if rate is not None:
                     total += wallet.balance * rate
                 # Если курс неизвестен, валюта не учитывается
         return total
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Создает словарь для последующей записи в JSON."""
+        return {
+            "user_id": self._user_id,
+            "wallets": {
+                currency_code: {"balance": wallet.balance}
+                for currency_code, wallet in self._wallets.items()
+            }
+        }
+
+    # Считывает портфолию из JSON
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Portfolio":
+        """Создает объект Portfolio из словаря."""
+        portfolio = cls.__new__(cls)
+        portfolio._user_id = data["user_id"]
+
+        wallets = {}
+        for currency_code, wallet_data in data["wallets"].items():
+            balance = wallet_data["balance"]
+            wallet = Wallet(currency_code=currency_code, balance=balance)
+            wallets[currency_code] = wallet
+
+        portfolio._wallets = wallets
+        return portfolio
