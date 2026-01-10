@@ -2,7 +2,8 @@
 
 import json # Для работы с JSON
 from typing import Dict, Any # для аннотаций
-import valutatrade_hub.constants as const # Импорт констант с путями к файлам
+from valutatrade_hub.infra.settings import SettingsLoader
+import valutatrade_hub.constants as const
 from valutatrade_hub.core.models import User, Portfolio # Импорт основных классов программы
 from valutatrade_hub.core.currencies import get_currency
 from valutatrade_hub.core.exceptions import ( # Импортируем исключения
@@ -336,6 +337,13 @@ def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, 
 # 6. Команда на получение курса валют
 def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
     """Получает курс одной валюты к другой."""
+
+    # ИСПОЛЬЗОВАНИЕ SINGLETON
+    from valutatrade_hub.infra.settings import SettingsLoader
+    settings = SettingsLoader()
+    rates_ttl = settings.get("rates_ttl_seconds", 300)
+    
+
     if not from_currency or not from_currency.strip():
         return {"success": False, "message": "\nИсходная валюта не может быть пустой"}
     if not to_currency or not to_currency.strip():
@@ -379,4 +387,5 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
     lines.append(f"\nКурс {from_curr}→{to_curr}: {rate:.8f} (обновлено: {updated_at})")
     lines.append(f"\nОбратный курс {to_curr}→{from_curr}: {reverse_rate:.8f}")
 
+    print(f'\nКурсы обновляются каждые {rates_ttl} с')
     return {"success": True, "message": "\n".join(lines)}
