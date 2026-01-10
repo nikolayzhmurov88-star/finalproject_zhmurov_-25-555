@@ -1,7 +1,9 @@
 """Интерфейс командной строки"""
 
 import argparse # Для парсинга команд
+import logging
 from typing import Dict, Any # Для аннотаций
+from valutatrade_hub.logging_config import setup_logging# Импортируем логирование
 from valutatrade_hub.core.usecases import (  # Импортируем функции команд из бизнесслогики
     register_user,
     login_user,
@@ -10,6 +12,9 @@ from valutatrade_hub.core.usecases import (  # Импортируем функц
     sell_currency,
     get_rate,
 )
+
+# Инициализируем логгер 
+logger = logging.getLogger("valutatrade")
 
 # Объявляем переменные для текущего пользователя
 current_user_id: int = None
@@ -63,6 +68,10 @@ def parse_command_line(line: str) -> argparse.Namespace: # Функция пар
 def main() -> None:
     """Точка входа CLI"""
     global current_user_id, current_username
+
+    # Инициализируем логирование
+    setup_logging()
+    logger.info("Запуск ValutaTrade Hub CLI")
 
     print("\nДобро пожаловать в ValutaTrade Hub!\n")
     print("\nВведите '-- help' или <команда> -- help, для справки.\n")

@@ -11,6 +11,7 @@ from valutatrade_hub.core.exceptions import ( # Импортируем искл�
     CurrencyNotFoundError,
     ApiRequestError
 )
+from valutatrade_hub.decorators import log_action # Импортируем декоратор
 
 
 # Вспомогательные функции для работы с JSON
@@ -31,6 +32,7 @@ def save_json(path: const.Path, data: Dict[str, Any]) -> None:
 
 
 # 1. Команда регистрации
+@log_action(action="REGISTER", verbose=True) 
 def register_user(username: str, password: str) -> Dict[str, Any]:
     """Регистрирует нового пользователя."""
     users_data = load_json(const.USERS_FILE)
@@ -82,6 +84,7 @@ def register_user(username: str, password: str) -> Dict[str, Any]:
 
 
 # 2. Команда входа в систему
+@log_action(action="LOGIN", verbose=True) 
 def login_user(username: str, password: str) -> Dict[str, Any]:
     """Входит в систему под пользователем"""
 
@@ -155,6 +158,7 @@ def show_portfolio(user_id: int, base_currency: str = "USD") -> Dict[str, Any]:
     
 
 # 4. Команда купить валюту
+@log_action(action="BUY", verbose=True) # Декоратор для логирования
 def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, Any]:
     """Покупает валюту"""
     if not currency_code or not currency_code.strip():
@@ -251,9 +255,8 @@ def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, A
         return {"success": False, "message": str(e)}
 
 
-
-
 # 5. Команда на продажу валюты
+@log_action(action="SELL", verbose=True) # Декоратор для логирования
 def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, Any]:
     """Продаёт валюту"""
     if not currency_code or not currency_code.strip():
@@ -334,11 +337,12 @@ def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, 
 
     return {"success": True, "message": "\n".join(lines)}
 
+
 # 6. Команда на получение курса валют
 def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
     """Получает курс одной валюты к другой."""
 
-    # ИСПОЛЬЗОВАНИЕ SINGLETON
+    # Использование singleton
     from valutatrade_hub.infra.settings import SettingsLoader
     settings = SettingsLoader()
     rates_ttl = settings.get("rates_ttl_seconds", 300)
