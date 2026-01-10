@@ -13,6 +13,10 @@ from valutatrade_hub.core.usecases import (  # Импортируем функц
     get_rate,
 )
 
+from valutatrade_hub.core.exceptions import ( # Импорт исключений
+    CurrencyNotFoundError,
+    ApiRequestError
+)
 # Инициализируем логгер 
 logger = logging.getLogger("valutatrade")
 
@@ -171,7 +175,8 @@ def main() -> None:
                 else:
                     print(result["message"])
 
-        elif args.command == "get-rate":         # Получить курс
+
+        elif args.command == "get-rate":       
             result = get_rate(
                 from_currency=getattr(args, "from"),
                 to_currency=args.to,
@@ -179,8 +184,19 @@ def main() -> None:
             if result["success"]:
                 print(result["message"])
             else:
-                print(result["message"])
-
+                # Обогащённые сообщения для разных типов ошибок (задание 3.6)
+                error_msg = result["message"]
+                if "Неизвестная валюта" in error_msg:
+                    print(f"Ошибка валюты: {error_msg}")
+                    print("   Проверьте правильность кодов валют.")
+                elif "Курсы устарели" in error_msg or "TTL" in error_msg:
+                    print(f"Ошибка актуальности: {error_msg}")
+                    print("   Попробуйте позже или обновите курсы.")
+                elif "не удалось получить курс" in error_msg or "недоступен" in error_msg:
+                    print(f"Ошибка данных: {error_msg}")
+                    print("Возможно, курс для этой пары не поддерживается.")
+                else:
+                    print(error_msg)
 
 if __name__ == "__main__":
     main()
