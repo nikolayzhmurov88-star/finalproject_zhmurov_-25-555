@@ -12,6 +12,8 @@ from valutatrade_hub.core.exceptions import ( # Импортируем искл�
     ApiRequestError
 )
 from valutatrade_hub.decorators import log_action # Импортируем декоратор
+import logging
+import time
 
 
 # Вспомогательные функции для работы с JSON
@@ -28,6 +30,32 @@ def save_json(path: const.Path, data: Dict[str, Any]) -> None:
     path.parent.mkdir(exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+# Функция для безопасной записи
+def safe_json_operation(file_path: const.Path, operation_func) -> Any:
+    """Безопасная операция чтение→модификация→запись."""
+    try:
+        # Чтение
+        if not file_path.exists():
+            data = {}
+        else:
+            with file_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        
+        # Модификация
+        new_data = operation_func(data)
+        
+        # Запись
+        file_path.parent.mkdir(exist_ok=True, parents=True)
+        with file_path.open("w", encoding="utf-8") as f:
+            json.dump(new_data, f, ensure_ascii=False, indent=2)
+        
+        return new_data
+        
+    except Exception as e:
+        logger = logging.getLogger("valutatrade")
+        logger.error(f"Ошибка при работе с {file_path}: {e}")
+        raise
 
 
 
@@ -168,15 +196,12 @@ def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, A
     if not isinstance(amount, (int, float)) or amount <= 0:
         return {"success": False, "message": "'amount' должен быть положительным числом"}
     
-    #==================================================
-    '''
+ 
     # Проверяем существование валюты
     try:
         get_currency(currency_code)
     except CurrencyNotFoundError as e:
         return {"success": False, "message": str(e)}
-    '''
-    #====================================================
 
     # Загружаем портфель
     portfolios_data = load_json(const.PORTFOLIOS_FILE)
@@ -239,8 +264,19 @@ def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, A
         target_wallet.balance += amount
 
         # Сохраняем обновлённый портфель
-        portfolio_data["wallets"] = {k: {"balance": v.balance} for k, v in portfolio._wallets.items()}
-        save_json(const.PORTFOLIOS_FILE, {"portfolios": portfolios})
+
+        def update_portfolio(data):
+            portfolios = data.get("portfolios", [])
+            for i, p in enumerate(portfolios):
+                if p["user_id"] == user_id:
+                    # Обновляем только нужный портфель
+                    p["wallets"] = {k: {"balance": v.balance} for k, v in portfolio._wallets.items()}
+                    portfolios[i] = p
+                    break
+            data["portfolios"] = portfolios
+            return data
+        
+        safe_json_operation(const.PORTFOLIOS_FILE, update_portfolio)
 
         # Формируем сообщение
         lines = []
@@ -265,6 +301,12 @@ def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, 
 
     if not isinstance(amount, (int, float)) or amount <= 0:
         return {"success": False, "message": "'amount' должен быть положительным числом"}
+    
+    # Валидация валюты
+    try:
+        get_currency(currency_code)  
+    except CurrencyNotFoundError as e:
+        return {"success": False, "message": str(e)}
 
     # Загружаем портфель
     portfolios_data = load_json(const.PORTFOLIOS_FILE)
@@ -325,8 +367,27 @@ def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, 
     usd_wallet.balance += revenue_usd
 
     # Сохраняем обновлённый портфель
-    portfolio_data["wallets"] = {k: {"balance": v.balance} for k, v in portfolio._wallets.items()}
-    save_json(const.PORTFOLIOS_FILE, {"portfolios": portfolios})
+    def update_portfolio(data):
+        portfolios = data.get("portfolios", [])
+        for i, p in enumerate(portfolios):
+            if p["user_id"] == user_id:
+                # Обновляем только нужный портфель
+                p["wallets"] = {k: {"balance": v.balance} for k, v in portfolio._wallets.items()}
+                portfolios[i] = p
+                break
+        data["portfolios"] = portfolios
+        return data
+    
+    try:
+        # Используем безопасную операцию
+        data = load_json(const.PORTFOLIOS_FILE)
+        new_data = update_portfolio(data)
+        save_json(const.PORTFOLIOS_FILE, new_data)
+    except Exception as e:
+        logger = logging.getLogger("valutatrade")
+        logger.error(f"Ошибка сохранения портфеля: {e}")
+        return {"success": False, "message": "Ошибка при сохранении данных"}
+
 
     # Формируем сообщение
     lines = []
@@ -343,7 +404,6 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
     """Получает курс одной валюты к другой."""
 
     # Использование singleton
-    from valutatrade_hub.infra.settings import SettingsLoader
     settings = SettingsLoader()
     rates_ttl = settings.get("rates_ttl_seconds", 300)
     
@@ -356,8 +416,7 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
     from_curr = from_currency.strip().upper()
     to_curr = to_currency.strip().upper()
 
-    #=================================================
-    '''
+
         # Проверяем существование валют
     try:
         get_currency(from_curr)
@@ -368,10 +427,25 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
         get_currency(to_curr)
     except CurrencyNotFoundError as e:
         return {"success": False, "message": str(e)}
-    '''
-    #=================================================
+
 
     rates_data = load_json(const.RATES_FILE)
+
+
+    # Проверка актуальности курсов
+    if "last_refresh" in rates_data:
+        last_refresh = int(rates_data["last_refresh"])
+        current_time = int(time.time())
+
+        if (current_time - last_refresh) > rates_ttl:
+            return {
+                "success": False, 
+                "message": str(ApiRequestError(
+                    f"Курсы устарели. TTL: {rates_ttl} секунд. "
+                    f"Требуется обновление через внешний API."
+                ))
+            }
+
     pair = f"{from_curr}_{to_curr}"
     rate_info = rates_data.get(pair)
 
@@ -392,4 +466,9 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
     lines.append(f"\nОбратный курс {to_curr}→{from_curr}: {reverse_rate:.8f}")
 
     print(f'\nКурсы обновляются каждые {rates_ttl} с')
-    return {"success": True, "message": "\n".join(lines)}
+    return {
+        "success": True, 
+        "message": "\n".join(lines),
+        "rate": rate,         
+        "updated_at": updated_at 
+    }

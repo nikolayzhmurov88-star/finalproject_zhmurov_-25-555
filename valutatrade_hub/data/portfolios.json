@@ -15,10 +15,10 @@
       "user_id": 2,
       "wallets": {
         "USD": {
-          "balance": 40662.79
+          "balance": 100000.0
         },
         "BTC": {
-          "balance": 1.0
+          "balance": 0.0
         }
       }
     }

@@ -102,8 +102,14 @@ class CryptoCurrency(Currency):
 
 
 # Реестр валют
-_currencies = {}
-
+_currencies = {
+    "USD": FiatCurrency("USD", "US Dollar", "United States"),
+    "EUR": FiatCurrency("EUR", "Euro", "European Union"),
+    "RUB": FiatCurrency("RUB", "Russian Ruble", "Russia"),
+    "BTC": CryptoCurrency("BTC", "Bitcoin", "SHA-256", 1_000_000_000_000),
+    "ETH": CryptoCurrency("ETH", "Ethereum", "Ethash", 400_000_000_000),
+    "XRP": CryptoCurrency("XRP", "Ripple", "XRP Ledger", 80_000_000_000)
+}
 
 # Функция для обработки неизвестных кодов
 def get_currency(code: str) -> Currency:
