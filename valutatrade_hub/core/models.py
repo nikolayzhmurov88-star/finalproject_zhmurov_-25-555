@@ -7,6 +7,7 @@ import json # для работы с JSON
 from datetime import datetime # для обработки даты и времени
 from typing import Dict, Any # для аннотаций
 import valutatrade_hub.constants as const # Импорт констант с путями к файлам JSON
+from valutatrade_hub.core.exceptions import InsufficientFundsError # Импортируем исключение
 
 
 class User:
@@ -169,6 +170,20 @@ class Wallet:
             raise ValueError("Сумма снятия должна быть положительной")
         if amount > self.balance:
             raise ValueError("Недостаточно средств на кошельке")
+        self.balance -= amount
+
+
+    def withdraw(self, amount: float) -> None:
+        if not isinstance(amount, (int, float)):
+            raise TypeError("\Сумма должна быть числом")
+        if amount <= 0:
+            raise ValueError("\Сумма снятия должна быть положительной")
+        if amount > self.balance:
+            raise InsufficientFundsError(  # Вызываем исключение
+                available=self.balance,
+                required=amount,
+                code=self.currency_code
+            )
         self.balance -= amount
 
     def get_balance_info(self) -> dict:

@@ -1,6 +1,7 @@
 """ Модуль для работы с валютами """
 
 from abc import ABC, abstractmethod # Импортируем инструменты для работы с абстрактными классами
+from valutatrade_hub.core.exceptions import CurrencyNotFoundError # Импортируем обработку исключения
 
 
 class Currency(ABC): # Объявляем абстрактный класс
@@ -111,7 +112,7 @@ def get_currency(code: str) -> Currency:
     """
     code = code.upper()
     if code not in _currencies:
-        raise ValueError(f"Валюта с кодом '{code}' не найдена")
+        raise CurrencyNotFoundError(code)  # Используем исключение
     return _currencies[code]
 
 

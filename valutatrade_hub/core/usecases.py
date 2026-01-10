@@ -4,6 +4,12 @@ import json # Для работы с JSON
 from typing import Dict, Any # для аннотаций
 import valutatrade_hub.constants as const # Импорт констант с путями к файлам
 from valutatrade_hub.core.models import User, Portfolio # Импорт основных классов программы
+from valutatrade_hub.core.currencies import get_currency
+from valutatrade_hub.core.exceptions import ( # Импортируем исключения
+    InsufficientFundsError,
+    CurrencyNotFoundError,
+    ApiRequestError
+)
 
 
 # Вспомогательные функции для работы с JSON
@@ -156,6 +162,16 @@ def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, A
 
     if not isinstance(amount, (int, float)) or amount <= 0:
         return {"success": False, "message": "'amount' должен быть положительным числом"}
+    
+    #==================================================
+    '''
+    # Проверяем существование валюты
+    try:
+        get_currency(currency_code)
+    except CurrencyNotFoundError as e:
+        return {"success": False, "message": str(e)}
+    '''
+    #====================================================
 
     # Загружаем портфель
     portfolios_data = load_json(const.PORTFOLIOS_FILE)
@@ -176,18 +192,18 @@ def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, A
     # Получаем курс из rates.json
     rates_data = load_json(const.RATES_FILE)
     if not isinstance(rates_data, dict):
-        return {"success": False, "message": "\nФайл rates.json повреждён или пустой"}
+        return {"success": False, "message": str(ApiRequestError("файл rates.json повреждён или пустой"))}
 
     # Ищем пару currency_code → USD
     pair = f"{currency_code}_USD"
     rate_info = rates_data.get(pair)
 
     if rate_info is None:
-        return {"success": False, "message": f"\nНе удалось получить курс для {currency_code}→USD"}
+        return {"success": False, "message": str(ApiRequestError(f"не удалось получить курс для {currency_code}→USD"))}
 
     if not isinstance(rate_info, dict) or "rate" not in rate_info:
-        return {"success": False, "message": f"\nНеверный формат курса для {currency_code}→USD"}
-
+        return {"success": False, "message": str(ApiRequestError(f"неверный формат курса для {currency_code}→USD"))}
+    
     rate = rate_info["rate"]
     cost_usd = amount * rate
 
@@ -198,7 +214,11 @@ def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, A
         if usd_wallet.balance < cost_usd:
             return {
                 "success": False,
-                "message": f"\nНедостаточно средств: требуется {cost_usd:.2f} USD, доступно {usd_wallet.balance:.2f} USD"
+                "message": str(InsufficientFundsError(
+                    available=usd_wallet.balance,
+                    required=cost_usd,
+                    code="USD"
+                ))
             }
 
         # Добавляем валюту, если её ещё нет
@@ -265,22 +285,29 @@ def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, 
     # Получаем кошелёк
     wallet = portfolio.get_wallet(currency_code)
     if wallet.balance < amount:
-        return {"success": False, "message": f"\nНедостаточно средств: требуется {amount:.4f} {currency_code}, доступно {wallet.balance:.4f} {currency_code}"}
+        return {
+        "success": False,
+        "message": str(InsufficientFundsError(
+            available=wallet.balance,
+            required=amount,
+            code=currency_code
+            ))
+        }
 
-    # Получаем курс из rates.json
+    # Получаем курс из rates.json    
     rates_data = load_json(const.RATES_FILE)
     if not isinstance(rates_data, dict):
-        return {"success": False, "message": "\nФайл rates.json повреждён или пустой"}
+        return {"success": False, "message": str(ApiRequestError("файл rates.json повреждён или пустой"))}
 
     # Ищем пару currency_code → USD
     pair = f"{currency_code}_USD"
     rate_info = rates_data.get(pair)
 
     if rate_info is None:
-        return {"success": False, "message": f"\nНе удалось получить курс для {currency_code}→USD"}
+        return {"success": False, "message": str(ApiRequestError(f"не удалось получить курс для {currency_code}→USD"))}
 
     if not isinstance(rate_info, dict) or "rate" not in rate_info:
-        return {"success": False, "message": f"\nНеверный формат курса для {currency_code}→USD"}
+        return {"success": False, "message": str(ApiRequestError(f"неверный формат курса для {currency_code}→USD"))}
 
     rate = rate_info["rate"]
     revenue_usd = amount * rate
@@ -317,12 +344,28 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
     from_curr = from_currency.strip().upper()
     to_curr = to_currency.strip().upper()
 
+    #=================================================
+    '''
+        # Проверяем существование валют
+    try:
+        get_currency(from_curr)
+    except CurrencyNotFoundError as e:
+        return {"success": False, "message": str(e)}
+
+    try:
+        get_currency(to_curr)
+    except CurrencyNotFoundError as e:
+        return {"success": False, "message": str(e)}
+    '''
+    #=================================================
+
     rates_data = load_json(const.RATES_FILE)
     pair = f"{from_curr}_{to_curr}"
     rate_info = rates_data.get(pair)
 
+
     if rate_info is None:
-        return {"success": False, "message": f"\nКурс {from_curr}→{to_curr} недоступен. Повторите попытку позже."}
+        return {"success": False, "message": str(ApiRequestError(f"курс {from_curr}→{to_curr} недоступен"))}
 
     rate = rate_info["rate"]
     updated_at = rate_info.get("updated_at", rates_data.get("last_refresh", "unknown"))
