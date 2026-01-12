@@ -1,19 +1,18 @@
 """
-Декораторы для ValutaTrade Hub.
+Декоратор для ведения логов.
 """
 
 import logging
 from datetime import datetime
 from functools import wraps
-from typing import Callable, Any, Dict, Optional
-
+from typing import Callable, Any, Dict
 
 def log_action(action: str, verbose: bool = False):
     """
     Декоратор для логирования доменных операций.
     
     Args:
-        action: Тип действия (BUY, SELL, REGISTER, LOGIN, etc.)
+        action: Тип действия (BUY, SELL, REGISTER, LOGIN)
         verbose: Подробное логирование с контекстом
     """
     def decorator(func: Callable) -> Callable:

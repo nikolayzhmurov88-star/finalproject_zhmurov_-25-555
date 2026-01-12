@@ -13,10 +13,8 @@ prettytable = "^3.10.0"
 ruff = "^0.6.8"
 
 [tool.poetry.scripts]
-project = "valutatrade_hub.cli.interface:main"
-
-
-
+# Скрипт для запуска через poetry run project
+project = "main:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -1,5 +1,5 @@
 """
-Константы проекта - всё из SettingsLoader.
+Константы проекта
 """
 
 from pathlib import Path
@@ -8,7 +8,7 @@ from valutatrade_hub.infra.settings import SettingsLoader
 # Singleton с настройками
 settings = SettingsLoader()
 
-# ВСЁ из config.json через SettingsLoader
+# Из config.json через SettingsLoader
 DATA_DIR = Path(settings.get("data_dir"))
 USERS_FILE = Path(settings.get("users_file"))
 PORTFOLIOS_FILE = Path(settings.get("portfolios_file"))

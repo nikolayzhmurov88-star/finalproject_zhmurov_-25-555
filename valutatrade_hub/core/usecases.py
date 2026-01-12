@@ -2,18 +2,17 @@
 
 import json # Для работы с JSON
 from typing import Dict, Any # для аннотаций
-from valutatrade_hub.infra.settings import SettingsLoader
-import valutatrade_hub.constants as const
-from valutatrade_hub.core.models import User, Portfolio # Импорт основных классов программы
+from valutatrade_hub.infra.settings import SettingsLoader # Синглтон
+import valutatrade_hub.constants as const # Импорт констант
+from valutatrade_hub.core.models import User, Portfolio, Wallet # Импорт основных классов программы
 from valutatrade_hub.core.currencies import get_currency
 from valutatrade_hub.core.exceptions import ( # Импортируем исключения
     InsufficientFundsError,
     CurrencyNotFoundError,
-    ApiRequestError
-)
-from valutatrade_hub.decorators import log_action # Импортируем декоратор
-import logging
-import time
+    ApiRequestError)
+from valutatrade_hub.decorators import log_action # Импортируем декоратор для логирования
+import logging # Библиотека для логирования
+import time # Время
 
 
 # Вспомогательные функции для работы с JSON
@@ -63,53 +62,61 @@ def safe_json_operation(file_path: const.Path, operation_func) -> Any:
 @log_action(action="REGISTER", verbose=True) 
 def register_user(username: str, password: str) -> Dict[str, Any]:
     """Регистрирует нового пользователя."""
-    users_data = load_json(const.USERS_FILE)
-    users = users_data.get("users", [])
+    try:
+        users_data = load_json(const.USERS_FILE)
+        users = users_data.get("users", [])
 
-    # Проверка: username не пустой и уникален
-    username = username.strip()
+        # Проверка: username не пустой и уникален
+        username = username.strip()
 
-    for user in users:
-        if user["username"] == username:
-            return {"success": False, "message": f"\nИмя пользователя '{username}' уже занято"}
+        for user in users:
+            if user["username"] == username:
+                return {"success": False, "message": f"\nИмя пользователя '{username}' уже занято"}
 
-    # Генерируем user_id
-    user_id = 1
-    if users:
-        user_id = max(u["user_id"] for u in users) + 1
+        # Генерируем user_id
+        user_id = 1
+        if users:
+            user_id = max(u["user_id"] for u in users) + 1
 
-    # Создаём User 
-    user = User(
-        user_id=user_id,
-        username=username,
-        password=password,
-    )
+        # Создаём User 
+        user = User(
+            user_id=user_id,
+            username=username,
+            password=password,
+        )
 
-    # Сохраняем пользователя
-    users.append(user.to_dict())
-    save_json(const.USERS_FILE, {"users": users})
+        # Сохраняем пользователя
+        users.append(user.to_dict())
+        save_json(const.USERS_FILE, {"users": users})
 
-    # Создаём портфель
-    portfolio = Portfolio(user_id = user_id, wallets={})
+        # Создаём портфель
+        portfolio = Portfolio(user_id = user_id, wallets={})
 
-    # Добавляем USD-кошелёк и пополняем на 100 000
-    portfolio.add_currency("USD")
-    wallet_usd = portfolio.get_wallet("USD")
-    wallet_usd.deposit(100000.0)
+        # Добавляем USD-кошелёк и пополняем на 100 000
+        portfolio.add_currency("USD")
+        wallet_usd = portfolio.get_wallet("USD")
+        wallet_usd.deposit(100000.0)
 
-    # Сохраняем портфель в JSON
-    portfolios_data = load_json(const.PORTFOLIOS_FILE)
-    portfolios = portfolios_data.get("portfolios", [])
-    portfolios.append(portfolio.to_dict())
-    save_json(const.PORTFOLIOS_FILE, {"portfolios": portfolios})
-
-
-    return {
-        "success": True,
-        "message": f"\nПользователь '{username}' зарегистрирован (id={user_id}). Войдите: login --username {username} --password ****"
-    }
+        # Сохраняем портфель в JSON
+        portfolios_data = load_json(const.PORTFOLIOS_FILE)
+        portfolios = portfolios_data.get("portfolios", [])
+        portfolios.append(portfolio.to_dict())
+        save_json(const.PORTFOLIOS_FILE, {"portfolios": portfolios})
 
 
+        return {
+            "success": True,
+            "message": f"\nПользователь '{username}' зарегистрирован (id={user_id}). Войдите: login --username {username} --password ****"
+        }
+    
+    except ValueError as e:
+        # Ловим ValueError 
+        return {"success": False, "message": str(e)}
+
+    except Exception as e:
+        logger = logging.getLogger("valutatrade")
+        logger.error(f"Неожиданная ошибка при регистрации: {e}")
+        return {"success": False, "message": "\nОшибка при регистрации"}
 
 # 2. Команда входа в систему
 @log_action(action="LOGIN", verbose=True) 
@@ -256,12 +263,12 @@ def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, A
             portfolio.add_currency(currency_code)
 
         # Получаем кошелёк валюты
-        target_wallet = portfolio.get_wallet(currency_code)
-        old_balance = target_wallet.balance
+        target_wallet: Wallet = portfolio.get_wallet(currency_code)
+        old_balance: Wallet = target_wallet.balance
 
         # Списываем USD и пополняем валюту
-        usd_wallet.balance -= cost_usd
-        target_wallet.balance += amount
+        usd_wallet.withdraw(cost_usd)
+        target_wallet.deposit(amount)
 
         # Сохраняем обновлённый портфель
 
@@ -329,7 +336,7 @@ def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, 
         return {"success": False, "message": f"\nВалюта {currency_code} не найдена в портфеле"}
 
     # Получаем кошелёк
-    wallet = portfolio.get_wallet(currency_code)
+    wallet: Wallet = portfolio.get_wallet(currency_code)
     if wallet.balance < amount:
         return {
         "success": False,
@@ -362,9 +369,10 @@ def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, 
     old_balance = wallet.balance
 
     # Списываем валюту и пополняем USD
-    wallet.balance -= amount
-    usd_wallet = portfolio.get_wallet("USD")
-    usd_wallet.balance += revenue_usd
+    wallet.withdraw(amount)
+    usd_wallet: Wallet = portfolio.get_wallet("USD")
+    usd_wallet.deposit(revenue_usd)
+
 
     # Сохраняем обновлённый портфель
     def update_portfolio(data):

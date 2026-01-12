@@ -24,3 +24,9 @@ data/*.tmp
 
 # Poetry
 poetry.lock
+
+# Пользовательские данные
+data/users.json
+data/portfolios.json
+data/rates.json
+

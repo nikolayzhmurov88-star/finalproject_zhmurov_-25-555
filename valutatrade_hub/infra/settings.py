@@ -1,6 +1,6 @@
 """
 SettingsLoader - Singleton для загрузки конфигурации.
-ВСЁ из config.json, никаких значений по умолчанию в коде.
+Из config.json.
 """
 
 import json
@@ -10,9 +10,7 @@ from typing import Any
 
 class SettingsLoader:
     """
-    Singleton для загрузки конфигурации ТОЛЬКО из config.json.
-    
-    Если config.json нет или он повреждён - программа НЕ РАБОТАЕТ.
+    Singleton для загрузки конфигурации.
     """
     
     _instance = None
@@ -36,7 +34,7 @@ class SettingsLoader:
 
     
     def _load_config(self) -> None:
-        """Загружает конфигурацию ТОЛЬКО из config.json."""
+        """Загружает конфигурацию из config.json."""
         project_root = Path(__file__).parent.parent.parent
         config_path = project_root / "config.json"
         

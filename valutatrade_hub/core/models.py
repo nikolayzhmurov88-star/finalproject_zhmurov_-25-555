@@ -163,17 +163,6 @@ class Wallet:
         self.balance += amount
 
     def withdraw(self, amount: float) -> None:
-        """Снимает средства с кошелька, если баланс позволяет"""
-        if not isinstance(amount, (int, float)):
-            raise TypeError("Сумма должна быть числом")
-        if amount <= 0:
-            raise ValueError("Сумма снятия должна быть положительной")
-        if amount > self.balance:
-            raise ValueError("Недостаточно средств на кошельке")
-        self.balance -= amount
-
-
-    def withdraw(self, amount: float) -> None:
         if not isinstance(amount, (int, float)):
             raise TypeError("\Сумма должна быть числом")
         if amount <= 0:
@@ -263,7 +252,9 @@ class Portfolio:
                     total += wallet.balance * rate
                 # Если курс неизвестен, валюта не учитывается
         return total
-    
+
+
+    # Методы для работы с JSON 
     def to_dict(self) -> Dict[str, Any]:
         """Создает словарь для последующей записи в JSON."""
         return {

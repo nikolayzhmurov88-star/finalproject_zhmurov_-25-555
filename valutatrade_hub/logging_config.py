@@ -33,7 +33,7 @@ def setup_logging():
         # Файловый обработчик с ротацией
         file_handler = logging.handlers.RotatingFileHandler(
             filename=log_file,
-            maxBytes=10 * 1024 * 1024,  # 10 MB
+            maxBytes=10 * 1024 * 1024,  
             backupCount=5,
             encoding='utf-8'
         )

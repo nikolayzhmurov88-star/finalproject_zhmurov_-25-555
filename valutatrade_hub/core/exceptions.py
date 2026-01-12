@@ -2,7 +2,7 @@
 Пользовательские исключения.
 """
 
-
+# Родительский класс
 class ValutaTradeError(Exception):
     """Базовое исключение для всех ошибок ValutaTrade Hub."""
     pass
