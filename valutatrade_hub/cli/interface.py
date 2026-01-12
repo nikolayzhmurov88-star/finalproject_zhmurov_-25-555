@@ -4,7 +4,6 @@
 
 import argparse
 import logging
-from typing import Dict, Any
 
 from valutatrade_hub.core.usecases import (
     register_user,
