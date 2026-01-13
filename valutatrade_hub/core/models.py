@@ -217,41 +217,66 @@ class Portfolio:
             raise KeyError(f"\nВалюта {currency_code} не найдена в портфеле")
         return self._wallets[currency_code]
 
+    
     def get_total_value(self, base_currency: str = "USD") -> float:
         """
         Возвращает общую стоимость портфеля в указанной базовой валюте.
-        Курсы валют загружаются из rates.json.
+        1. Считаем всё в USD
+        2. Конвертируем USD → base_currency
         """
         try:
-            with open(const.RATES_FILE, "r", encoding="utf-8") as f:
+            # Загружаем курсы
+            with open(const.RATES_FILE, 'r', encoding='utf-8') as f:
                 rates_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError, PermissionError):
-            # Если файл не найден или повреждён, возвращаем 0.0
+            
+            if not isinstance(rates_data, dict) or "pairs" not in rates_data:
+                return 0.0
+            
+            pairs = rates_data.get("pairs", {})
+            
+            # 1. Считаем всё в USD
+            total_usd = 0.0
+            
+            for currency, wallet in self._wallets.items():
+                balance = wallet.balance
+                
+                if currency == "USD":
+                    total_usd += balance
+                else:
+                    # Ищем курс к USD
+                    pair_to_usd = f"{currency}_USD"
+                    rate_info = pairs.get(pair_to_usd)
+                    
+                    if rate_info and "rate" in rate_info:
+                        total_usd += balance * rate_info["rate"]
+                    else:
+                        # Обратный курс
+                        reverse_pair = f"USD_{currency}"
+                        reverse_info = pairs.get(reverse_pair)
+                        if reverse_info and "rate" in reverse_info and reverse_info["rate"] > 0:
+                            total_usd += balance / reverse_info["rate"]
+            
+            # 2. Если нужна USD, возвращаем
+            if base_currency == "USD":
+                return total_usd
+            
+            # 3. Конвертируем в base_currency
+            usd_to_base = f"USD_{base_currency}"
+            base_to_usd = f"{base_currency}_USD"
+            
+            usd_to_base_info = pairs.get(usd_to_base)
+            if usd_to_base_info and "rate" in usd_to_base_info:
+                return total_usd * usd_to_base_info["rate"]
+            
+            base_to_usd_info = pairs.get(base_to_usd)
+            if base_to_usd_info and "rate" in base_to_usd_info and base_to_usd_info["rate"] > 0:
+                return total_usd / base_to_usd_info["rate"]
+            
+            # Курс не найден
+            return total_usd
+            
+        except Exception:
             return 0.0
-
-        
-        # Строим exchange_rates: валюта курс к base_currency
-        exchange_rates = {}
-        for pair, info in rates_data.items():
-            if pair in ("source", "last_refresh"):
-                continue
-            if "_" not in pair:
-                continue
-            from_curr, to_curr = pair.split("_", 1)
-            if to_curr == base_currency:
-                exchange_rates[from_curr] = info["rate"]
-        
-        # Считаем общую стоимость
-        total = 0.0
-        for currency, wallet in self._wallets.items():
-            if currency == base_currency:
-                total += wallet.balance
-            else:
-                rate = exchange_rates.get(currency)
-                if rate is not None:
-                    total += wallet.balance * rate
-                # Если курс неизвестен, валюта не учитывается
-        return total
 
 
     # Методы для работы с JSON 

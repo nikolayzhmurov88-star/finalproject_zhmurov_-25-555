@@ -233,7 +233,7 @@ def buy_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, A
 
     # Ищем пару currency_code → USD
     pair = f"{currency_code}_USD"
-    rate_info = rates_data.get(pair)
+    rate_info = rates_data.get("pairs", {}).get(pair) 
 
     if rate_info is None:
         return {"success": False, "message": str(ApiRequestError(f"не удалось получить курс для {currency_code}→USD"))}
@@ -354,7 +354,7 @@ def sell_currency(user_id: int, currency_code: str, amount: float) -> Dict[str, 
 
     # Ищем пару currency_code → USD
     pair = f"{currency_code}_USD"
-    rate_info = rates_data.get(pair)
+    rate_info = rates_data.get("pairs", {}).get(pair)
 
     if rate_info is None:
         return {"success": False, "message": str(ApiRequestError(f"не удалось получить курс для {currency_code}→USD"))}
@@ -424,8 +424,16 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
     from_curr = from_currency.strip().upper()
     to_curr = to_currency.strip().upper()
 
+    # Если валюты одинаковые
+    if from_curr == to_curr:
+        return {
+            "success": True,
+            "message": f"\nКурс {from_curr}→{to_curr}: 1.00000000",
+            "rate": 1.0,
+            "updated_at": "N/A"
+        }
 
-        # Проверяем существование валют
+    # Проверяем существование валют
     try:
         get_currency(from_curr)
     except CurrencyNotFoundError as e:
@@ -438,7 +446,13 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
 
 
     rates_data = load_json(const.RATES_FILE)
-
+    
+    # Проверяем структуру данных
+    if "pairs" not in rates_data:
+        return {
+            "success": False, 
+            "message": str(ApiRequestError("Неверный формат файла rates.json: отсутствует ключ 'pairs'"))
+        }
 
     # Проверка актуальности курсов
     if "last_refresh" in rates_data:
@@ -459,7 +473,7 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
                         f"Последнее обновление: {last_refresh_str}"
                     ))
                 }
-        except (ValueError, AttributeError) as e:
+        except (ValueError, AttributeError):
             # Если не можем распарсить время, считаем данные устаревшими
             return {
                 "success": False, 
@@ -468,29 +482,51 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
                 ))
             }
 
+    pairs = rates_data.get("pairs", {})
+    
+    # Ищем пару в файле 
     pair = f"{from_curr}_{to_curr}"
-    rate_info = rates_data.get(pair)
-
-
+    rate_info = pairs.get(pair)
+    
     if rate_info is None:
         return {"success": False, "message": str(ApiRequestError(f"курс {from_curr}→{to_curr} недоступен"))}
 
-    rate = rate_info["rate"]
+    # Получаем информацию для вывода
+    rate_value = rate_info["rate"]
     updated_at = rate_info.get("updated_at", rates_data.get("last_refresh", "unknown"))
-
-    if rate > 0:
-        reverse_rate = 1.0 / rate
+    source = rate_info.get("source", "unknown")
+    
+    # Рассчитываем обратный курс
+    if rate_value > 0:
+        reverse_rate = 1.0 / rate_value
     else:
         reverse_rate = 0.0
 
+    # Форматируем вывод в зависимости от величины курса
+    if rate_value < 0.0001:
+        rate_str = f"{rate_value:.10f}"
+        reverse_rate_str = f"{reverse_rate:.2f}"
+    elif rate_value < 1:
+        rate_str = f"{rate_value:.6f}"
+        reverse_rate_str = f"{reverse_rate:.6f}"
+    elif rate_value < 1000:
+        rate_str = f"{rate_value:.4f}"
+        reverse_rate_str = f"{reverse_rate:.4f}"
+    else:
+        rate_str = f"{rate_value:.2f}"
+        reverse_rate_str = f"{reverse_rate:.8f}"
+
     lines = []
-    lines.append(f"\nКурс {from_curr}→{to_curr}: {rate:.8f} (обновлено: {updated_at})")
-    lines.append(f"\nОбратный курс {to_curr}→{from_curr}: {reverse_rate:.8f}")
+    lines.append(f"\nКурс {from_curr} → {to_curr}: {rate_str} (источник: {source})")
+    lines.append(f"Обновлено: {updated_at}")
+    lines.append(f"\nОбратный курс {to_curr} → {from_curr}: {reverse_rate_str}")
 
     print(f'\nКурсы обновляются каждые {rates_ttl} с')
+    
     return {
         "success": True, 
         "message": "\n".join(lines),
-        "rate": rate,         
-        "updated_at": updated_at 
+        "rate": rate_value,         
+        "updated_at": updated_at,
+        "source": source
     }

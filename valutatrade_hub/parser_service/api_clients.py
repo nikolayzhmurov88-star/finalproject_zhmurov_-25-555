@@ -5,7 +5,7 @@
 import requests # Для HTTPS запросов
 import logging # Для логирования
 from abc import ABC, abstractmethod # Для абстрактных классов
-from typing import Dict, Any # Аннотации
+from typing import Dict # Аннотации
 from valutatrade_hub.core.exceptions import ApiRequestError # Исключение
 from .config import ParserConfig # Конфигурация парсера
 
@@ -78,7 +78,8 @@ class CoinGeckoClient(BaseApiClient):
             logger.error(error_msg)
             raise ApiRequestError(error_msg)
 
-  
+
+
 class ExchangeRateApiClient(BaseApiClient):
     """Клиент для ExchangeRate-API (фиатные валюты)."""
 
@@ -107,10 +108,19 @@ class ExchangeRateApiClient(BaseApiClient):
             result = {}
             for currency in self.config.FIAT_CURRENCIES:
                 if currency in rates:
-                    rate = float(rates[currency])
-                    pair = f"{currency}_{self.config.BASE_FIAT_CURRENCY}"
-                    result[pair] = rate
-                    logger.debug(f"Получен курс {pair}: {rate}")
+
+
+                    rate_from_api = float(rates[currency])  
+                    
+                    if rate_from_api > 0:
+                        correct_rate = 1.0 / rate_from_api  
+                    else:
+                        correct_rate = 0.0
+                    
+                    pair = f"{currency}_{self.config.BASE_FIAT_CURRENCY}" 
+                    result[pair] = correct_rate
+                    
+                    logger.debug(f"Получен курс {pair}: API={rate_from_api}, исправленный={correct_rate}")
                 else:
                     logger.warning(f"Валюта {currency} не найдена в ответе API")
 

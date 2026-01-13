@@ -218,7 +218,7 @@ def run_cli() -> None:
                     result = updater.run_update(source=source)
                     
                     if result["success"]:
-                        print(f"Обновление успешно!")
+                        print("Обновление успешно!")
                         print(f"   Обновлено курсов: {result['rates_count']}")
                         print(f"   Время обновления: {result['last_refresh']}")
                         
@@ -292,6 +292,6 @@ def run_cli() -> None:
                             
                 except Exception as e:
                     print(f"Ошибка при чтении курсов: {e}")
-                    
+
         except Exception as e:
                 print(f"Ошибка выполнения команды: {e}")

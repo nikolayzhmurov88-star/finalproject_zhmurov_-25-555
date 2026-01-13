@@ -73,10 +73,41 @@ class RatesUpdater:
         if not all_rates and errors:
             # Если ни один источник не сработал
             raise ApiRequestError(f"Все источники данных недоступны. Ошибки: {errors}")
-
+    
         # Формируем итоговый объект для сохранения
+        all_pairs_data = {}
+
+        # Добавляем оригинальные курсы
+        for pair, rate in all_rates.items():
+            all_pairs_data[pair] = {
+                "rate": rate,
+                "updated_at": timestamp,
+                "source": self._get_source_for_pair(pair)
+            }
+            
+            # Добавляем обратные курсы
+            if "_" in pair:
+                try:
+                    from_curr, to_curr = pair.split("_")
+                    
+                    # Не создаем обратные курсы для пар с одинаковой валютой
+                    if from_curr != to_curr and rate > 0:
+                        reverse_pair = f"{to_curr}_{from_curr}"
+                        reverse_rate = 1.0 / rate
+                        
+                        # Добавляем обратный курс, если его еще нет
+                        if reverse_pair not in all_pairs_data:
+                            all_pairs_data[reverse_pair] = {
+                                "rate": reverse_rate,
+                                "updated_at": timestamp,
+                                "source": f"calculated from {pair}"
+                            }
+                            logger.debug(f"Добавлен обратный курс: {reverse_pair} = {reverse_rate}")
+                except (ValueError, ZeroDivisionError) as e:
+                    logger.warning(f"Не удалось создать обратный курс для {pair}: {e}")
+
         result_data = {
-            "pairs": {},
+            "pairs": all_pairs_data,
             "last_refresh": timestamp,
             "meta": {
                 "sources_used": list(clients_to_run.keys()),
@@ -84,12 +115,6 @@ class RatesUpdater:
             }
         }
 
-        for pair, rate in all_rates.items():
-            result_data["pairs"][pair] = {
-                "rate": rate,
-                "updated_at": timestamp,
-                "source": self._get_source_for_pair(pair)
-            }
 
         # Сохраняем данные
         try:
@@ -100,12 +125,12 @@ class RatesUpdater:
             logger.error(error_msg)
             raise ApiRequestError(error_msg)
 
-        logger.info(f"Обновление завершено. Сохранено {len(all_rates)} курсов.")
+        logger.info(f"Обновление завершено. Сохранено {len(all_pairs_data)} курсов.")
         return {
-            "success": True,
-            "rates_count": len(all_rates),
-            "last_refresh": timestamp,
-            "errors": errors if errors else None,
+        "success": True,
+        "rates_count": len(all_pairs_data),
+        "last_refresh": timestamp,
+        "errors": errors if errors else None,
         }
 
     def _get_source_for_pair(self, pair: str) -> str:
