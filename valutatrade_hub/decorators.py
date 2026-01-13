@@ -74,7 +74,7 @@ def log_action(action: str, verbose: bool = False):
                                 rate_match = re.search(r'по курсу (\d+\.?\d*)', msg)
                                 if rate_match:
                                     log_data["rate"] = rate_match.group(1)
-                                    log_data["base"] = "USD"  # Пока только USD
+                                    log_data["base"] = "USD" 
                     else:
                         log_data["result"] = "ERROR"
                         log_data["error_message"] = result.get("message", "Unknown error")

@@ -5,7 +5,6 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List
 from .config import ParserConfig
@@ -33,7 +32,6 @@ class RatesStorage:
             data: Данные для сохранения в формате задания.
         """
         try:
-            # Атомарная запись через временный файл
             temp_file = self.rates_file.with_suffix(".tmp")
             with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)

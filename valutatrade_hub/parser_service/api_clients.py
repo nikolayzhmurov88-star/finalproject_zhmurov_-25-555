@@ -34,7 +34,7 @@ class CoinGeckoClient(BaseApiClient):
 
     def __init__(self, config: ParserConfig):
         self.config = config
-
+    
     def fetch_rates(self) -> Dict[str, float]:
         """Получает курсы криптовалют к USD."""
         try:
@@ -53,7 +53,7 @@ class CoinGeckoClient(BaseApiClient):
 
             logger.debug(f"Запрос к CoinGecko: {url}")
             response = requests.get(url, timeout=self.config.REQUEST_TIMEOUT)
-            response.raise_for_status()  # Проверяем HTTP-статус
+            response.raise_for_status() 
 
             data = response.json()
 
@@ -78,7 +78,7 @@ class CoinGeckoClient(BaseApiClient):
             logger.error(error_msg)
             raise ApiRequestError(error_msg)
 
-
+  
 class ExchangeRateApiClient(BaseApiClient):
     """Клиент для ExchangeRate-API (фиатные валюты)."""
 
@@ -88,17 +88,11 @@ class ExchangeRateApiClient(BaseApiClient):
     def fetch_rates(self) -> Dict[str, float]:
         """Получает курсы фиатных валют к USD."""
         try:
-            # Формируем URL с API-ключом
-            url = (
-                f"{self.config.EXCHANGERATE_API_BASE_URL}/"
-                f"{self.config.EXCHANGERATE_API_KEY}/"
-                f"latest/{self.config.BASE_FIAT_CURRENCY}"
-            )
-
+            # Формируем полный URL из базового URL, API ключа и эндпоинта
+            url = f"{self.config.EXCHANGERATE_API_URL}/{self.config.EXCHANGERATE_API_KEY}/latest/USD"
             logger.debug(f"Запрос к ExchangeRate-API: {url}")
             response = requests.get(url, timeout=self.config.REQUEST_TIMEOUT)
             response.raise_for_status()
-
             data = response.json()
 
             # Проверяем успешность ответа API
@@ -107,15 +101,18 @@ class ExchangeRateApiClient(BaseApiClient):
                 logger.error(error_msg)
                 raise ApiRequestError(error_msg)
 
-            rates = data.get("rates", {})
+            # Получаем курсы
+            rates = data.get("conversion_rates", {})
+            
             result = {}
             for currency in self.config.FIAT_CURRENCIES:
                 if currency in rates:
-                    # Курс уже в формате "к USD", т.к. база - USD
-                    rate = rates[currency]
+                    rate = float(rates[currency])
                     pair = f"{currency}_{self.config.BASE_FIAT_CURRENCY}"
                     result[pair] = rate
                     logger.debug(f"Получен курс {pair}: {rate}")
+                else:
+                    logger.warning(f"Валюта {currency} не найдена в ответе API")
 
             logger.info(f"ExchangeRate-API: успешно получено {len(result)} курсов.")
             return result

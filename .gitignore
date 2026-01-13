@@ -29,4 +29,5 @@ poetry.lock
 data/users.json
 data/portfolios.json
 data/rates.json
-
+data/exchange_rates.json
+data/action.log

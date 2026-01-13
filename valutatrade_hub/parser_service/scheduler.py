@@ -4,7 +4,6 @@
 
 import logging
 import threading
-import time
 from typing import Optional
 from .config import ParserConfig
 from .updater import RatesUpdater
@@ -56,7 +55,6 @@ class RateUpdateScheduler:
             except Exception as e:
                 logger.error(f"Ошибка в планировщике: {e}")
 
-            # Ожидаем указанный интервал или сигнал остановки
             self._stop_event.wait(self.interval)
 
     def run_once(self) -> None:

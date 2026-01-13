@@ -442,15 +442,29 @@ def get_rate(from_currency: str, to_currency: str) -> Dict[str, Any]:
 
     # Проверка актуальности курсов
     if "last_refresh" in rates_data:
-        last_refresh = int(rates_data["last_refresh"])
-        current_time = int(time.time())
-
-        if (current_time - last_refresh) > rates_ttl:
+        last_refresh_str = rates_data["last_refresh"]
+        
+        try:
+            # Конвертируем ISO строку в timestamp
+            from datetime import datetime
+            dt = datetime.fromisoformat(last_refresh_str.replace('Z', '+00:00'))
+            last_refresh = int(dt.timestamp())
+            
+            current_time = int(time.time())
+            if (current_time - last_refresh) > rates_ttl:
+                return {
+                    "success": False, 
+                    "message": str(ApiRequestError(
+                        f"Курсы устарели. TTL: {rates_ttl} секунд. "
+                        f"Последнее обновление: {last_refresh_str}"
+                    ))
+                }
+        except (ValueError, AttributeError) as e:
+            # Если не можем распарсить время, считаем данные устаревшими
             return {
                 "success": False, 
                 "message": str(ApiRequestError(
-                    f"Курсы устарели. TTL: {rates_ttl} секунд. "
-                    f"Требуется обновление через внешний API."
+                    f"Неверный формат времени в rates.json: {last_refresh_str}"
                 ))
             }
 

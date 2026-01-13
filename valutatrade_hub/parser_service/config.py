@@ -3,7 +3,7 @@
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple, Dict
 
 
@@ -14,31 +14,29 @@ class ParserConfig:
     """
     
     # API Ключи
-    # Приоритет: 1. Переменная окружения, 2. Хардкод для отладки
-    _DEBUG_API_KEY = ""  # !!!!УДАЛИТЬ ПЕРЕД КОММИОМ
+    # Возможность хардкода ключа для отладки
+    _DEBUG_API_KEY = ""  
     
     EXCHANGERATE_API_KEY: str = os.getenv("EXCHANGERATE_API_KEY", _DEBUG_API_KEY)
 
     # URL-адреса запросов
     # URL для получения цен криптовалют
-    COINGECKO_API_URL: str = "https://api.coingecko.com/api/v3/simple/price"
+    COINGECKO_URL: str = "https://api.coingecko.com/api/v3/simple/price"
     
-    # Полный URL для получения курсов фиатных валют
-    @property
-    def EXCHANGERATE_API_URL(self) -> str:
-        """Полный URL для запроса курсов валют."""
-        return f"https://v6.exchangerate-api.com/v6/{self.EXCHANGERATE_API_KEY}/latest/USD"
-
+    # Базовый URL для ExchangeRate-API
+    EXCHANGERATE_API_URL: str = "https://v6.exchangerate-api.com/v6"
+    
     # Списки отслеживаемых валют
     BASE_FIAT_CURRENCY: str = "USD"
-    FIAT_CURRENCIES: Tuple[str, ...] = ("EUR", "GBP", "RUB")
-    CRYPTO_CURRENCIES: Tuple[str, ...] = ("BTC", "ETH", "SOL")
     
-    CRYPTO_ID_MAP: Dict[str, str] = {
+    FIAT_CURRENCIES: Tuple[str, ...] = field(default_factory=lambda: ("EUR", "GBP", "RUB"))
+    CRYPTO_CURRENCIES: Tuple[str, ...] = field(default_factory=lambda: ("BTC", "ETH", "SOL"))
+    
+    CRYPTO_ID_MAP: Dict[str, str] = field(default_factory=lambda: {
         "BTC": "bitcoin",
         "ETH": "ethereum",
         "SOL": "solana",
-    }
+    })
 
     # Сетевые параметры
     REQUEST_TIMEOUT: int = 10
